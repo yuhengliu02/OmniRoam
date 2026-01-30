@@ -16,6 +16,12 @@
 - **[2026-02]** 📦 Released InteriorGS rendering pipeline
 - **[2026-02]** 🎬 Released Preview, Self-forcing, and Refine stage models
 
+
+
+https://github.com/user-attachments/assets/8e26dd1b-43ad-4b0a-8e99-5f97dc637980
+
+
+
 ## Introduction
 
 Modeling scenes using video generation models has garnered growing research interest in recent years. However, most existing approaches rely on perspective video models that synthesize only limited observations of a scene, leading to issues of completeness and global consistency. 
@@ -181,6 +187,10 @@ data/InteriorGS-360video/
 ```
 
 ## Inference
+
+
+https://github.com/user-attachments/assets/6323d12f-4df1-4924-8b46-6e78ab1c64ee
+
 
 ### Preview Stage
 
