@@ -1,0 +1,12 @@
+*__pycache__
+*.ckpt
+Wan-AI
+core*
+._*
+InteriorGS-360video
+output
+vis_ours_*
+models
+models/OmniRoam/**/*.ckpt
+models/OmniRoam/**/*.pt
+diffsynth.egg-info

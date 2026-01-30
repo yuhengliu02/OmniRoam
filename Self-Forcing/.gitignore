@@ -1,0 +1,17 @@
+__pycache__
+*.egg-info
+
+wan_models
+checkpoints
+
+Wan2.1-T2V-1.3B
+
+ode_pairs_custom_*
+ode_pairs_custom.lmdb_01
+ode_pairs_videos_*
+
+logs
+
+useless
+
+inference_output*

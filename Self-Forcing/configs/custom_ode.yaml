@@ -1,0 +1,62 @@
+# Training mode
+trainer: ode
+distribution_loss: ode
+
+# Model settings
+generator_ckpt: path/to/preview_model.pt
+generator_fsdp_wrap_strategy: size
+text_encoder_fsdp_wrap_strategy: size
+
+data_path: path/to/ode_pairs
+max_pair: 100000000
+
+use_trajectory_conditions: true
+
+height: 480
+width: 960
+num_frames: 81
+image_or_video_shape:
+- 1
+- 21
+- 16
+- 60
+- 120
+
+# Training hyperparameters
+batch_size: 1
+total_batch_size: 64
+lr: 2.0e-06
+beta1: 0.0
+beta2: 0.999
+weight_decay: 0.01
+max_grad_norm: 10.0
+
+model_kwargs:
+  timestep_shift: 5.0
+
+denoising_step_list:
+- 1000
+- 750
+- 500
+- 250
+warp_denoising_step: true
+num_train_timestep: 1000
+timestep_shift: 5.0
+mixed_precision: true
+gradient_checkpointing: true
+num_frame_per_block: 3
+independent_first_frame: false
+causal: true
+i2v: false
+
+sharding_strategy: hybrid_full
+
+log_iters: 50
+gc_interval: 100
+seed: 0
+no_visualize: true
+
+wandb_host: https://api.wandb.ai
+wandb_key: 
+wandb_entity: 
+wandb_project: 
