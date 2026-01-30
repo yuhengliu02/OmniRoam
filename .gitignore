@@ -5,6 +5,7 @@ core*
 ._*
 InteriorGS-360video
 output
+wandb.txt
 vis_ours_*
 models
 models/OmniRoam/**/*.ckpt
