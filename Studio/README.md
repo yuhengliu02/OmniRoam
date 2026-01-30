@@ -4,6 +4,12 @@
 
 An interactive web-based system for generating panoramic videos using OmniRoam models. This system provides a user-friendly interface for **Preview**, **Self-forcing**, and **Refine** stages of video generation.
 
+
+
+https://github.com/user-attachments/assets/8345e5b2-7dd7-4c84-8431-0ea50fbe5809
+
+
+
 ## Features
 
 - 🎬 **Multi-Stage Generation Pipeline**
