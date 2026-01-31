@@ -1,25 +1,29 @@
 ![studio display](https://yuheng.ink/project-page/omniroam/images/banner-main-white.png)
 
-# OmniRoam: World Wandering via Long-Horizon Panoramic Video Generation
+<div align="center" style="margin-top: 0px; margin-bottom: 0px;">
+<h1>OmniRoam: World Wandering via Long-Horizon Panoramic Video Generation</h1>
 
 [![Project Page](https://img.shields.io/badge/Project-Page-blue)](https://yuheng.ink/project-page/omniroam/)
 [![arXiv](https://img.shields.io/badge/arXiv-2026.xxxxx-b31b1b.svg)](https://arxiv.org/abs/xxxx.xxxxx)
 [![HuggingFace Models](https://img.shields.io/badge/🤗-Models-yellow)](https://huggingface.co/yuhengliu02/OmniRoam)
 [![License](https://img.shields.io/badge/License-Adobe%20Research-green)](LICENSE)
 
+Yuheng Liu<sup>1*</sup>, Xin Lin<sup>2</sup>, Xinke Li<sup>3</sup>, Baihan Yang<sup>2</sup>, Chen Wang<sup>4</sup>, Kalyan Sunkavalli<sup>5</sup>, Yannick Hold-Geoffroy<sup>5</sup>, Hao Tan<sup>5</sup>, Kai Zhang<sup>5</sup>, Xiaohui Xie<sup>1</sup>, Zifan Shi<sup>5</sup>, Yiwei Hu<sup>5</sup>
+
+(*Work done during an internship at Adobe)
+
+<sup>1</sup>UC Irvine, <sup>2</sup>UC San Diego, <sup>3</sup>City University of Hong Kong, <sup>4</sup>University of Pennsylvania, <sup>5</sup>Adobe Research
+
 ![OmniRoam Teaser](https://yuheng.ink/project-page/omniroam/images/teaser.png)
+</div>
+
+## Video
+https://github.com/user-attachments/assets/8e26dd1b-43ad-4b0a-8e99-5f97dc637980
+
 
 ## Updates
 
 - **[2026-02]** 🎉 Initial release of code, models, and datasets
-- **[2026-02]** 🚀 Released OmniRoam Studio - interactive web interface
-- **[2026-02]** 📦 Released InteriorGS rendering pipeline
-- **[2026-02]** 🎬 Released Preview, Self-forcing, and Refine stage models
-
-
-
-https://github.com/user-attachments/assets/8e26dd1b-43ad-4b0a-8e99-5f97dc637980
-
 
 
 ## Introduction
@@ -188,7 +192,7 @@ data/InteriorGS-360video/
 
 ## Inference
 
-
+### Results
 https://github.com/user-attachments/assets/6323d12f-4df1-4924-8b46-6e78ab1c64ee
 
 
