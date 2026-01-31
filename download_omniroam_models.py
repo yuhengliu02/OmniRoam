@@ -22,12 +22,12 @@ def download_models():
     print("="*60)
     print("Downloading OmniRoam Model Checkpoints")
     print("="*60)
-    print("Repository: yuhengliu02/OmniRoam\n")
+    print("Repository: Yuheng02/OmniRoam\n")
     
     try:
         # Download entire repository
         local_dir = snapshot_download(
-            repo_id="yuhengliu02/OmniRoam",
+            repo_id="Yuheng02/OmniRoam",
             repo_type="model",
             local_dir="models/OmniRoam",
             local_dir_use_symlinks=False
@@ -44,7 +44,7 @@ def download_models():
     except Exception as e:
         print(f"✗ Failed to download models: {e}\n")
         print("Please try manual download:")
-        print("  1. Visit: https://huggingface.co/yuhengliu02/OmniRoam")
+        print("  1. Visit: https://huggingface.co/Yuheng02/OmniRoam")
         print("  2. Download the Preview/, Self-forcing/, and Refine/ folders")
         print("  3. Place them in: models/OmniRoam/")
         return False

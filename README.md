@@ -5,7 +5,7 @@
 
 [![Project Page](https://img.shields.io/badge/Project-Page-blue)](https://yuheng.ink/project-page/omniroam/)
 [![arXiv](https://img.shields.io/badge/arXiv-2026.xxxxx-b31b1b.svg)](https://arxiv.org/abs/xxxx.xxxxx)
-[![HuggingFace Models](https://img.shields.io/badge/🤗-Models-yellow)](https://huggingface.co/yuhengliu02/OmniRoam)
+[![HuggingFace Models](https://img.shields.io/badge/🤗-Models-yellow)](https://huggingface.co/Yuheng02/OmniRoam)
 [![License](https://img.shields.io/badge/License-Adobe%20Research-green)](LICENSE)
 
 Yuheng Liu<sup>1*</sup>, Xin Lin<sup>2</sup>, Xinke Li<sup>3</sup>, Baihan Yang<sup>2</sup>, Chen Wang<sup>4</sup>, Kalyan Sunkavalli<sup>5</sup>, Yannick Hold-Geoffroy<sup>5</sup>, Hao Tan<sup>5</sup>, Kai Zhang<sup>5</sup>, Xiaohui Xie<sup>1</sup>, Zifan Shi<sup>5</sup>, Yiwei Hu<sup>5</sup>
@@ -86,7 +86,7 @@ Download the Preview, Self-forcing, and Refine stage checkpoints:
 python download_omniroam_models.py
 
 # Option 2: Manual download from Hugging Face
-# Visit: https://huggingface.co/yuhengliu02/OmniRoam
+# Visit: https://huggingface.co/Yuheng02/OmniRoam
 # Download the following files:
 # - preview.ckpt    → models/OmniRoam/Preview/
 # - self-forcing.pt → models/OmniRoam/Self-forcing/
