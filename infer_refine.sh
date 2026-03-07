@@ -8,7 +8,7 @@ set -e
 python infer_omniroam.py \
   --enable_refine \
   --refine_local_dir path/to/generated/preview/videos \
-  --refine_num_segments 2 \
+  --refine_num_segments 8 \
   --refine_degrade_down_h 480 \
   --refine_degrade_down_w 960 \
   --refine_use_crossfade \

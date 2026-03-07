@@ -97,22 +97,7 @@ def _refine_degrade_blur_alias(vid_CTHW: torch.Tensor,
 
 
 def resolve_ckpt_path(ckpt_path: str) -> str:
-    if ckpt_path.startswith("s3://"):
-        from flash_s3_dataloader.s3_io import download_file
-        
-        cache_dir = "/tmp/omniroam_ckpt_cache"
-        os.makedirs(cache_dir, exist_ok=True)
-        
-        import hashlib
-        path_hash = hashlib.md5(ckpt_path.encode()).hexdigest()[:12]
-        local_path = os.path.join(cache_dir, f"refine_{path_hash}.ckpt")
-        
-        if not os.path.exists(local_path) or os.path.getsize(local_path) == 0:
-            print(f"[Refine] Downloading checkpoint from S3: {ckpt_path}")
-            download_file(ckpt_path, local_path)
-        
-        return local_path
-    
+    # modified for non-adobe server
     return ckpt_path
 
 

@@ -10,7 +10,7 @@ set -e  # Exit on error
 
 # Model and config paths
 CONFIG_PATH="./configs/self_forcing_dmd_omniroam.yaml"
-CHECKPOINT_PATH="/sensei-fs-3/users/yuhengl/workspace/Adobe-Proj/ReCamMaster/Self-Forcing/logs/dmd/bug-fixed01/no_ema/checkpoint_model_001000/model.pt"
+CHECKPOINT_PATH="" # add the path to the checkpoint
 
 # Input data
 LOCAL_FOLDER="../vis_images"  # Folder containing panorama images (.jpg, .png, etc.)

@@ -20,7 +20,7 @@ from PIL import Image
 import imageio.v2 as imageio
 
 from diffsynth import ModelManager, WanVideoClickMapPipeline, save_video
-from interactive_system.app_utils.stitch import read_video_as_tensor, write_tensor_to_video
+from Studio.app_utils.stitch import read_video_as_tensor, write_tensor_to_video
 
 import multiprocessing as mp
 import math
@@ -604,9 +604,9 @@ def parse_args():
                    help="Multi-GPU parallel, e.g., 'cuda:0,cuda:1,cuda:2,cuda:3'; leave empty for single GPU with --device")
 
     p.add_argument("--enable_speed_control", action="store_true", default=False,
-                help="Enable speed control condition (map s in [0.5,2] to log2(s) in [-1,1] injected to model)")
+                help="Enable speed control condition")
     p.add_argument("--speed_fixed", type=float, default=None,
-                help="Fixed speed s in [0.5,2.0]; if not set, random with 2 decimals")
+                help="Fixed speed s in [1.0, 8.0]; if not set, random with 2 decimals")
     
     p.add_argument("--local_images_dir", type=str, default=None,
                    help="If provided, enables local static image inference mode. Each image in this directory will be repeated to num_frames frames as input video.")

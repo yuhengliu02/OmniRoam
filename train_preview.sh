@@ -46,7 +46,7 @@ echo ""
 # ============================================
 
 # Dataset paths
-SPLIT_JSON="configs/train_test_files_test.json"
+SPLIT_JSON="configs/train_test_files.json"
 DATA_ROOT="data/InteriorGS-360video"
 FRAMES_SUBDIR="pano_camera0"
 MAX_FRAMES=800

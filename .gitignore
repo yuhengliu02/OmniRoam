@@ -7,7 +7,6 @@ InteriorGS-360video
 output
 wandb.txt
 vis_ours_*
-models
 models/OmniRoam/**/*.ckpt
 models/OmniRoam/**/*.pt
 diffsynth.egg-info

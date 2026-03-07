@@ -42,8 +42,6 @@ DEFAULT_BASE_MODELS = [
 SPEED_S_MIN = 0.125
 SPEED_S_MAX = 8.0
 
-TMP_CKPT_DIR = "/mnt/localssd/tmp-model"
-
 NEGATIVE_PROMPT = (
     "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，"
     "整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，"
@@ -52,42 +50,8 @@ NEGATIVE_PROMPT = (
 )
 
 
-def _s3_cache_local_path(s3_uri: str) -> str:
-    if not s3_uri.startswith("s3://"):
-        raise ValueError(f"not an s3 uri: {s3_uri}")
-    rel = s3_uri[len("s3://"):].lstrip("/").replace("\\", "/")
-    parts = []
-    for seg in rel.split("/"):
-        if seg in ("", "."):
-            continue
-        if seg == "..":
-            parts.append("__up__")
-        else:
-            parts.append(seg)
-    local_path = os.path.join(TMP_CKPT_DIR, *parts)
-    local_path = os.path.normpath(local_path)
-    base = os.path.normpath(TMP_CKPT_DIR)
-    if os.path.commonpath([base, local_path]) != base:
-        raise RuntimeError(f"normalized path escapes cache dir: {local_path}")
-    return local_path
-
-
 def resolve_ckpt_path(ckpt_path: str) -> str:
-    if ckpt_path.startswith("s3://"):
-        local_path = _s3_cache_local_path(ckpt_path)
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        if not os.path.exists(local_path) or os.path.getsize(local_path) == 0:
-            print(f"[CKPT] Downloading {ckpt_path} -> {local_path}")
-            if os.path.exists(local_path) and os.path.getsize(local_path) == 0:
-                try:
-                    os.remove(local_path)
-                except Exception:
-                    pass
-            from flash_s3_dataloader.s3_io import download_file
-            download_file(ckpt_path, local_path)
-        else:
-            print(f"[CKPT] Reuse local {local_path}")
-        return local_path
+    # modified for non-adobe server
     return ckpt_path
 
 

@@ -46,7 +46,7 @@ echo "Will use ${#SPLITS[@]} processes in parallel"
 echo "============================================"
 
 BLENDER_PATH="blender-4.5.6-linux-x64/blender"
-SCRIPT_PATH="render_clean.py"
+SCRIPT_PATH="render.py"
 DATASETS_FILE="valid_datasets.txt"
 
 if [ ! -f "$BLENDER_PATH" ]; then

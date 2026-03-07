@@ -23,7 +23,7 @@ https://github.com/user-attachments/assets/8e26dd1b-43ad-4b0a-8e99-5f97dc637980
 
 ## Updates
 
-- **[2026-02]** 🎉 Initial release of code, models, and datasets
+- **[2026-04]** 🎉 Initial release of code, models, and datasets
 
 
 ## Introduction
@@ -48,7 +48,7 @@ To train our model, we introduce two panoramic video datasets that incorporate b
 
 ```bash
 # Download Rust and Cargo
-curl --proto '=https' --tlsv1.2 -sSf [https://sh.rustup.rs](https://sh.rustup.rs/) | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh
 . "$HOME/.cargo/env"
 
 # Clone repository
@@ -208,15 +208,26 @@ python infer_omniroam.py \
   --width 960 \
   --num_frames 81 \
   --ckpt_path models/OmniRoam/Preview/preview.ckpt \
+  --enable_speed_control \
+  --speed_fixed 1.0 \
+  --use_cam_traj \
+  --traj_mode fixed \
   --traj_preset forward \
-  --output_dir ./output_preview \
-  --devices cuda:0
+  --re_scale_pose fixed:1.0 \
+  --traj_s_curve_amp_m 1.4 \
+  --traj_loop_radius_m 1.5 \
+  --cfg_scale 5.0 \
+  --num_inference_steps 50 \
+  --output_dir ./vis_ours_480p_speed_1_forward \
+  --devices cuda:0,cuda:1,cuda:2,cuda:3,cuda:4,cuda:5,cuda:6,cuda:7
 
 # Or use the provided script
 ./infer_preview.sh
 ```
 
 **Trajectory Presets**: `forward`, `backward`, `left`, `right`, `s_curve`, `loop`
+
+Set `scale` using `--speed_fixed` between `1.0` and `8.0`.
 
 ### Self-Forcing Stage
 
@@ -254,13 +265,18 @@ Upscale and extend preview videos to high resolution and long-horizon:
 # Refine preview videos
 python infer_omniroam.py \
   --enable_refine \
-  --refine_local_dir path/to/preview/videos \
+  --refine_local_dir path/to/generated/preview/videos \
   --refine_num_segments 8 \
+  --refine_degrade_down_h 480 \
+  --refine_degrade_down_w 960 \
+  --refine_use_crossfade \
+  --refine_crossfade_alpha 0.5 \
   --height 720 \
   --width 1440 \
+  --num_frames 81 \
   --ckpt_path models/OmniRoam/Refine/refine.ckpt \
-  --output_dir ./output_refined \
-  --devices cuda:0,cuda:1
+  --output_dir ./refined \
+  --devices cuda:0,cuda:1,cuda:2,cuda:3,cuda:4,cuda:5,cuda:6,cuda:7
 
 # Or use the provided script
 ./infer_refine.sh
