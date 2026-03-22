@@ -49,15 +49,10 @@ class ODERegression(BaseModel):
                 blk.projector.bias.zero_()
         
         print(f"[ODE] Added custom modules: speed_token_proj, speed_token_scale, cam_traj_encoder, projector to {len(self.generator.model.blocks)} blocks")
-        # ===========================================================
         
         if getattr(args, "generator_ckpt", False):
             print(f"[ODE] Loading pretrained generator from {args.generator_ckpt}")
             checkpoint = torch.load(args.generator_ckpt, map_location="cpu")
-            
-            # 兼容两种checkpoint格式：
-            # 1. ReCamMaster teacher格式：直接是state_dict
-            # 2. CausVid格式：{'generator': state_dict}
             if isinstance(checkpoint, dict) and 'generator' in checkpoint:
                 state_dict = checkpoint['generator']
                 print("  → Loaded from CausVid format (checkpoint['generator'])")
@@ -65,29 +60,21 @@ class ODERegression(BaseModel):
                 state_dict = checkpoint
                 print("  → Loaded from teacher format (direct state_dict)")
             
-            # 添加 'model.' 前缀到teacher checkpoint的keys
-            # 因为WanDiffusionWrapper.model需要这个前缀
             new_state_dict = {}
             for key, value in state_dict.items():
                 if not key.startswith('model.'):
-                    # 添加model.前缀（现在所有teacher的模块都应该能正确匹配了）
                     new_key = f'model.{key}'
-                    
-                    # Special handling: teacher's speed_token_scale is scalar, but student needs 1D tensor for FSDP
                     if key == 'speed_token_scale' and value.ndim == 0:
-                        value = value.unsqueeze(0)  # [] -> [1]
+                        value = value.unsqueeze(0)
                         print(f"  → Reshaped speed_token_scale from scalar to 1D tensor for FSDP compatibility")
                     
                     new_state_dict[new_key] = value
                 else:
                     new_state_dict[key] = value
-            
-            # 加载权重（非严格模式，因为causal/bidirectional架构差异）
             missing_keys, unexpected_keys = self.generator.load_state_dict(
                 new_state_dict, strict=False
             )
             
-            # Count custom module keys that were successfully loaded
             custom_keys_loaded = sum(1 for k in new_state_dict.keys() if any(x in k for x in ['speed_token', 'cam_traj_encoder', 'projector']))
             print(f"  → Loaded {len(new_state_dict) - len(unexpected_keys)} / {len(new_state_dict)} keys from teacher")
             print(f"  → Custom condition modules loaded: {custom_keys_loaded} keys")
@@ -117,7 +104,6 @@ class ODERegression(BaseModel):
         if args.gradient_checkpointing:
             self.generator.enable_gradient_checkpointing()
 
-        # Step 2: Initialize all hyperparameters
         self.timestep_shift = getattr(args, "timestep_shift", 1.0)
 
     def _initialize_models(self, args, device):
@@ -134,7 +120,6 @@ class ODERegression(BaseModel):
         self.vae = WanVAEWrapper()
         self.vae.requires_grad_(False)
         
-        # Need scheduler from generator for timestep list
         self.scheduler = self.generator.get_scheduler()
         self.scheduler.timesteps = self.scheduler.timesteps.to(device)
 
@@ -151,7 +136,6 @@ class ODERegression(BaseModel):
         """
         batch_size, num_denoising_steps, num_frames, num_channels, height, width = ode_latent.shape
 
-        # Step 1: Randomly choose a timestep for each frame
         index = self._get_timestep(
             0,
             len(self.denoising_step_list),
@@ -169,19 +153,7 @@ class ODERegression(BaseModel):
                 -1, -1, -1, num_channels, height, width).to(self.device)
         ).squeeze(1)
 
-        # Index the denoising_step_list on CPU, then move to device
         timestep = self.denoising_step_list[index.cpu()].to(self.device)
-
-        # if self.extra_noise_step > 0:
-        #     random_timestep = torch.randint(0, self.extra_noise_step, [
-        #                                     batch_size, num_frames], device=self.device, dtype=torch.long)
-        #     perturbed_noisy_input = self.scheduler.add_noise(
-        #         noisy_input.flatten(0, 1),
-        #         torch.randn_like(noisy_input.flatten(0, 1)),
-        #         random_timestep.flatten(0, 1)
-        #     ).detach().unflatten(0, (batch_size, num_frames)).type_as(noisy_input)
-
-        #     noisy_input[timestep == 0] = perturbed_noisy_input[timestep == 0]
 
         return noisy_input, timestep
 
@@ -189,9 +161,9 @@ class ODERegression(BaseModel):
         self,
         ode_latent: torch.Tensor,
         conditional_dict: dict,
-        trajectory: torch.Tensor = None,  # [B, 21, 12]
-        speed: torch.Tensor = None,  # [B, 1]
-        input_latent: torch.Tensor = None  # NEW: [B, 21, 16, H, W] full input video latent
+        trajectory: torch.Tensor = None,
+        speed: torch.Tensor = None,
+        input_latent: torch.Tensor = None
     ) -> Tuple[torch.Tensor, dict]:
         """
         Generate image/videos from noisy latents and compute the ODE regression loss.
@@ -207,21 +179,16 @@ class ODERegression(BaseModel):
             - loss: a scalar tensor representing the generator loss.
             - log_dict: a dictionary containing additional information for loss timestep breakdown.
         """
-        # Step 1: Run generator on noisy latents
         target_latent = ode_latent[:, -1]
 
         noisy_input, timestep = self._prepare_generator_input(
             ode_latent=ode_latent)
         
-        # NEW: Use last 3 frames of input_latent as initial latent for autoregressive generation
         initial_latent = None
         if input_latent is not None:
-            # Extract last 3 frames: [B, 21, 16, H, W] -> [B, 3, 16, H, W]
             initial_latent = input_latent[:, -3:, :, :, :]
-            # Add to conditional_dict for generator
             conditional_dict = {**conditional_dict, "initial_latent": initial_latent}
         
-        # Trajectory and speed are already in conditional_dict (added in trainer/ode.py)
 
         _, pred_image_or_video = self.generator(
             noisy_image_or_video=noisy_input,
@@ -229,7 +196,6 @@ class ODERegression(BaseModel):
             timestep=timestep
         )
 
-        # Step 2: Compute the regression loss
         mask = timestep != 0
 
         loss = F.mse_loss(

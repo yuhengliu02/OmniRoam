@@ -38,29 +38,21 @@ def make_cam_traj_from_preset_refspace(
 ) -> torch.Tensor:
     t_list = []
     
-    if preset in ["forward", "backward", "left", "right", "up", "down"]:
+    if preset in ["forward", "backward", "left", "right"]:
         dir_map = {
             "forward":  np.array([+1, 0, 0], dtype=np.float64),
             "backward": np.array([-1, 0, 0], dtype=np.float64),
             "right":    np.array([0, 0, +1], dtype=np.float64),
             "left":     np.array([0, 0, -1], dtype=np.float64),
-            "up":       np.array([0, +1, 0], dtype=np.float64),
-            "down":     np.array([0, -1, 0], dtype=np.float64),
         }
         d = dir_map[preset] * (float(step_m) / 4.0)
         p = np.zeros(3, dtype=np.float64)
         for i in range(81):
             t_list.append(p.copy())
             p += d
-    elif preset == "zigzag_forward":
-        for i in range(81):
-            x = (float(step_m) / 4.0) * i
-            saw = ((i % 20) / 20.0) - 0.5
-            z = float(zigzag_span_m) * saw * 2.0
-            t_list.append(np.array([x, 0.0, z], dtype=np.float64))
     else:
         raise ValueError(f"Unsupported preset for Self-Forcing: {preset}. "
-                        f"Self-Forcing only supports: forward, backward, left, right, up, down, zigzag_forward")
+                        f"Self-Forcing only supports: forward, backward, left, right")
     
     traj = []
     for k in range(21):
@@ -184,7 +176,7 @@ def _batch_resize_with_padding(
 
 class SelfForcingInference:
     
-    SUPPORTED_TRAJECTORIES = {"forward", "backward", "left", "right", "up", "down", "zigzag_forward"}
+    SUPPORTED_TRAJECTORIES = {"forward", "backward", "left", "right"}
     
     def __init__(
         self,

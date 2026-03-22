@@ -33,24 +33,20 @@ class CustomCausalInferencePipeline(torch.nn.Module):
         print("  - Uses FULL trajectory for all blocks (matching training)")
         print("="*80 + "\n")
         
-        # Step 1: Initialize all models
         self.generator = WanDiffusionWrapper(
             **getattr(args, "model_kwargs", {}), is_causal=True) if generator is None else generator
         self.text_encoder = WanTextEncoder() if text_encoder is None else text_encoder
         self.vae = WanVAEWrapper() if vae is None else vae
 
-        # Step 2: Initialize hyperparameters
         self.scheduler = self.generator.get_scheduler()
         self.denoising_step_list = torch.tensor(
             args.denoising_step_list, dtype=torch.long)
         
         if args.warp_denoising_step:
             timesteps = torch.cat((self.scheduler.timesteps.cpu(), torch.tensor([0], dtype=torch.float32)))
-            # Keep on CPU for indexing, then move to device
             self.denoising_step_list = timesteps[1000 - self.denoising_step_list].to(device)
             print(f"[CustomPipeline] Applied warp_denoising_step: {self.denoising_step_list.tolist()}")
         else:
-            # Move to device after initialization
             self.denoising_step_list = self.denoising_step_list.to(device)
             print(f"[CustomPipeline] Denoising steps: {self.denoising_step_list.tolist()}")
 
@@ -59,12 +55,10 @@ class CustomCausalInferencePipeline(torch.nn.Module):
         self.independent_first_frame = getattr(args, "independent_first_frame", False)
         self.context_noise = getattr(args, "context_noise", 0)
         
-        # Dynamically compute frame_seq_length based on resolution
         height = getattr(args, "height", 480)
         width = getattr(args, "width", 960)
-        # For WAN2.1: patch_size = (1, 2, 2), so each latent frame -> (H/2) * (W/2) tokens
         self.frame_seq_length = (height // 8 // 2) * (width // 8 // 2)
-        kv_cache_size = 24 * self.frame_seq_length  # 24 frames max
+        kv_cache_size = 24 * self.frame_seq_length
         
         print(f"[CustomPipeline] Configuration:")
         print(f"  - num_frame_per_block: {self.num_frame_per_block}")
@@ -82,11 +76,11 @@ class CustomCausalInferencePipeline(torch.nn.Module):
 
     def inference(
         self,
-        noise: torch.Tensor,  # (B, 21, 16, H, W)
+        noise: torch.Tensor,
         text_prompts: List[str],
-        cam_traj: Optional[torch.Tensor] = None,  # (B, 21, 12) - FULL trajectory
-        speed_scalar: Optional[torch.Tensor] = None,  # (B, 1)
-        initial_latent: Optional[torch.Tensor] = None,  # (B, 3, 16, H, W) or None
+        cam_traj: Optional[torch.Tensor] = None,
+        speed_scalar: Optional[torch.Tensor] = None,
+        initial_latent: Optional[torch.Tensor] = None,
         return_latents: bool = False,
     ) -> torch.Tensor:
         """
@@ -95,7 +89,7 @@ class CustomCausalInferencePipeline(torch.nn.Module):
         Args:
             noise: Input noise (B, num_frames, 16, H_lat, W_lat)
             text_prompts: List of text prompts
-            cam_traj: Camera trajectory (B, 21, 12) - FULL trajectory, not block-specific!
+            cam_traj: Camera trajectory (B, 21, 12)
             speed_scalar: Speed conditioning (B, 1)
             initial_latent: Initial context frames (B, 3, 16, H_lat, W_lat) for DMD
             return_latents: Whether to return latent representations
@@ -106,7 +100,6 @@ class CustomCausalInferencePipeline(torch.nn.Module):
         """
         batch_size, num_frames, num_channels, height, width = noise.shape
         
-        # Validate inputs
         assert num_frames % self.num_frame_per_block == 0, \
             f"num_frames ({num_frames}) must be divisible by num_frame_per_block ({self.num_frame_per_block})"
         
@@ -124,17 +117,12 @@ class CustomCausalInferencePipeline(torch.nn.Module):
         if speed_scalar is not None:
             print(f"  - speed_scalar: {speed_scalar.item():.2f}")
         
-        # Step 1: Encode text
         conditional_dict = self.text_encoder(text_prompts=text_prompts)
         
-        # Convert text embeddings to match generator dtype (bfloat16)
         if "prompt_embeds" in conditional_dict:
             conditional_dict["prompt_embeds"] = conditional_dict["prompt_embeds"].to(dtype=noise.dtype)
         
-        # Step 2: Add trajectory conditions (IMPORTANT: Use FULL trajectory!)
         if cam_traj is not None:
-            # Keep the FULL 21-frame trajectory - don't slice it per block!
-            # This matches how the model was trained
             conditional_dict["cam_traj"] = cam_traj
             print(f"  ✓ Added FULL trajectory to conditional_dict: {tuple(cam_traj.shape)}")
         
@@ -142,41 +130,36 @@ class CustomCausalInferencePipeline(torch.nn.Module):
             conditional_dict["speed_scalar"] = speed_scalar
             print(f"  ✓ Added speed_scalar to conditional_dict: {speed_scalar.item():.2f}")
         
-        # Prepare output tensor
         output = torch.zeros(
             [batch_size, num_output_frames, num_channels, height, width],
             device=noise.device,
             dtype=noise.dtype
         )
         
-        # Step 3: Initialize KV cache
         if self.kv_cache1 is None:
             print(f"  [KV Cache] Initializing new cache...")
             self._initialize_kv_cache(batch_size=batch_size, dtype=noise.dtype, device=noise.device)
             self._initialize_crossattn_cache(batch_size=batch_size, dtype=noise.dtype, device=noise.device)
         else:
             print(f"  [KV Cache] Resetting existing cache...")
-            # Reset cache for new generation
             for block_index in range(self.num_transformer_blocks):
                 self.crossattn_cache[block_index]["is_init"] = False
             for block_index in range(len(self.kv_cache1)):
                 self.kv_cache1[block_index]["global_end_index"] = torch.tensor([0], dtype=torch.long, device=noise.device)
                 self.kv_cache1[block_index]["local_end_index"] = torch.tensor([0], dtype=torch.long, device=noise.device)
         
-        # Step 4: Pre-fill KV cache with initial_latent (if provided)
         current_start_frame = 0
         if initial_latent is not None:
             print(f"\n  [KV Pre-fill] Using initial_latent: {tuple(initial_latent.shape)}")
             num_init_frames = initial_latent.shape[1]
             
-            # Create identity trajectory for static initial frames
             prefill_conditional_dict = conditional_dict.copy()
             if cam_traj is not None:
                 identity_traj = torch.zeros(batch_size, num_init_frames, 12, 
                                            device=cam_traj.device, dtype=cam_traj.dtype)
-                identity_traj[:, :, 0] = 1.0  # R[0,0]
-                identity_traj[:, :, 4] = 1.0  # R[1,1]
-                identity_traj[:, :, 8] = 1.0  # R[2,2]
+                identity_traj[:, :, 0] = 1.0
+                identity_traj[:, :, 4] = 1.0
+                identity_traj[:, :, 8] = 1.0
                 prefill_conditional_dict["cam_traj"] = identity_traj
                 print(f"    - Created identity trajectory for {num_init_frames} static frames")
             
@@ -189,21 +172,15 @@ class CustomCausalInferencePipeline(torch.nn.Module):
                     timestep=timestep,
                     kv_cache=self.kv_cache1,
                     crossattn_cache=self.crossattn_cache,
-                    current_start=current_start_frame * self.frame_seq_length  # KV cache at position [0,1,2]
+                    current_start=current_start_frame * self.frame_seq_length
                 )
             
-            # ===== NEW: Write initial_latent to output for alignment =====
             output[:, current_start_frame:current_start_frame + num_init_frames] = initial_latent
-            # =============================================================
             
             print(f"    ✓ KV cache pre-filled with {num_init_frames} frames")
             
-            # ===== Increment current_start_frame for append mode (matching training) =====
-            current_start_frame += num_init_frames  # Now = 3
+            current_start_frame += num_init_frames
             print(f"    ℹ️  current_start_frame incremented to {current_start_frame} (append mode)")
-            # =============================================================================
-        
-        # Step 5: Multi-step denoising (block by block)
         print(f"\n  [Denoising] Processing {num_blocks} blocks...")
         all_num_frames = [self.num_frame_per_block] * num_blocks
         
@@ -211,17 +188,14 @@ class CustomCausalInferencePipeline(torch.nn.Module):
             print(f"    Block {block_idx+1}/{num_blocks} ({current_num_frames} frames):")
             
             noisy_input = noise[:, block_idx * self.num_frame_per_block:(block_idx + 1) * self.num_frame_per_block]
-            # ===========================================================================
             
             block_conditional_dict = conditional_dict.copy()
             if cam_traj is not None:
-                # Get trajectory for current block's frames (aligned with noise indexing)
                 traj_start = block_idx * self.num_frame_per_block
                 traj_end = traj_start + self.num_frame_per_block
                 block_conditional_dict["cam_traj"] = cam_traj[:, traj_start:traj_end, :]
                 print(f"      └─ block cam_traj: [{traj_start}:{traj_end}], shape: {block_conditional_dict['cam_traj'].shape}")
             
-            # Multi-step denoising for this block
             for step_idx, current_timestep in enumerate(self.denoising_step_list):
                 timestep = torch.ones([batch_size, current_num_frames], device=noise.device, dtype=torch.int64) * current_timestep
                 
@@ -235,7 +209,6 @@ class CustomCausalInferencePipeline(torch.nn.Module):
                         current_start=current_start_frame * self.frame_seq_length
                     )
                 
-                # Add noise for next step (except last step)
                 if step_idx < len(self.denoising_step_list) - 1:
                     next_timestep = self.denoising_step_list[step_idx + 1]
                     noisy_input = self.scheduler.add_noise(
@@ -246,10 +219,8 @@ class CustomCausalInferencePipeline(torch.nn.Module):
                 else:
                     noisy_input = denoised_pred
             
-            # Record output
             output[:, current_start_frame:current_start_frame + current_num_frames] = denoised_pred
             
-            # Update KV cache with clean prediction (context noise)
             context_timestep = torch.ones_like(timestep) * self.context_noise
             with torch.no_grad():
                 self.generator(
@@ -266,7 +237,7 @@ class CustomCausalInferencePipeline(torch.nn.Module):
         
         if num_input_frames > 0:
             print(f"\n  [Post-processing] Keeping last 21 frames (frames {num_input_frames}:24)")
-            output = output[:, num_input_frames:, :, :, :]  # [:, 3:24] = 21 frames
+            output = output[:, num_input_frames:, :, :, :]
             print(f"    └─ Output shape after trimming: {tuple(output.shape)}")
         
         print(f"\n  [Decoding] Converting latents to pixels...")

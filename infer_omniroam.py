@@ -195,7 +195,7 @@ def run_worker(worker_id: int, device: str, args):
                 speed_scalar_tensor = _make_speed_tensor(0.0)
                 if args.enable_speed_control:
                     if args.speed_fixed is None:
-                        sampled = np.random.uniform(0.125, 8.0)
+                        sampled = np.random.uniform(1.1, 8.0)
                         used_speed_s = float(np.clip(np.round(sampled, 2), 0.125, 8.0))
                     else:
                         used_speed_s = float(np.clip(args.speed_fixed, 0.125, 8.0))

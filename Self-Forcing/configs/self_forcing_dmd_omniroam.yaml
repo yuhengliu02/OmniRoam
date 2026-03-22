@@ -56,13 +56,11 @@ ts_schedule: false
 num_train_timestep: 1000
 timestep_shift: 5.0
 
-# ===== Guidance and Loss =====
 guidance_scale: 3.0
 real_guidance_scale: 3.0
 fake_guidance_scale: 0.0
 denoising_loss_type: flow
 
-# ===== Optimization =====
 lr: 2.0e-06
 lr_critic: 8.0e-07
 beta1: 0.0
@@ -76,12 +74,10 @@ max_grad_norm_critic: 10.0
 batch_size: 1
 total_batch_size: 64
 
-# ===== Training Settings =====
 mixed_precision: true
 gradient_checkpointing: true
 sharding_strategy: full
 
-# Autoregressive settings
 num_frame_per_block: 3
 same_step_across_blocks: true
 independent_first_frame: false
@@ -89,46 +85,31 @@ last_step_only: false
 num_training_frames: 21
 causal: true
 
-# Context noise for KV cache update
 context_noise: 0
 
-# ===== EMA Settings =====
 ema_weight: 0.99
 ema_start_step: 200
 
-# ===== Logging and Checkpointing =====
 log_iters: 50
 gc_interval: 100
 seed: 0
 
-# Negative prompt (Chinese, for WAN2.1)
 negative_prompt: '色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走'
 
-# ===== Critic Update Ratio =====
 dfake_gen_update_ratio: 10
 
-# ===== Model Kwargs =====
 model_kwargs:
   timestep_shift: 5.0
 
-# ===== W&B Settings (use --disable-wandb to skip) =====
 wandb_host: https://api.wandb.ai
 wandb_key:
 wandb_entity:
 wandb_project:
 
-# ===== Other =====
 load_raw_video: false
 i2v: false
 no_save: false
 no_visualize: true
 
-# ===== Debug Mode =====
-# Enable detailed debug output for training verification
-# When enabled, prints detailed information about:
-# - Data loading (video IDs, frame ranges, trajectory stats)
-# - VAE encoding (shapes, statistics)
-# - Generator (KV cache pre-fill, trajectory usage)
-# - Teacher/Critic (42-frame input construction, guidance)
 debug: false
 

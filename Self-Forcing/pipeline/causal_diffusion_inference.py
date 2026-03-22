@@ -218,10 +218,8 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
                 print(f"kv_cache['local_end_index']: {self.kv_cache_pos[0]['local_end_index']}")
                 print(f"kv_cache['global_end_index']: {self.kv_cache_pos[0]['global_end_index']}")
 
-            # Step 3.2: record the model's output
             output[:, cache_start_frame:cache_start_frame + current_num_frames] = latents
 
-            # Step 3.3: rerun with timestep zero to update KV cache using clean context
             self.generator(
                 noisy_image_or_video=latents,
                 conditional_dict=conditional_dict,
@@ -241,11 +239,9 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
                 cache_start=cache_start_frame * self.frame_seq_length
             )
 
-            # Step 3.4: update the start and end frame indices
             current_start_frame += current_num_frames
             cache_start_frame += current_num_frames
 
-        # Step 4: Decode the output
         video = self.vae.decode_to_pixel(output)
         video = (video * 0.5 + 0.5).clamp(0, 1)
 
@@ -261,10 +257,8 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
         kv_cache_pos = []
         kv_cache_neg = []
         if self.local_attn_size != -1:
-            # Use the local attention size to compute the KV cache size
             kv_cache_size = self.local_attn_size * self.frame_seq_length
         else:
-            # Use the default KV cache size
             kv_cache_size = 32760
 
         for _ in range(self.num_transformer_blocks):
@@ -281,8 +275,8 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
                 "local_end_index": torch.tensor([0], dtype=torch.long, device=device)
             })
 
-        self.kv_cache_pos = kv_cache_pos  # always store the clean cache
-        self.kv_cache_neg = kv_cache_neg  # always store the clean cache
+        self.kv_cache_pos = kv_cache_pos
+        self.kv_cache_neg = kv_cache_neg
 
     def _initialize_crossattn_cache(self, batch_size, dtype, device):
         """
@@ -302,8 +296,8 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
                 "is_init": False
             })
 
-        self.crossattn_cache_pos = crossattn_cache_pos  # always store the clean cache
-        self.crossattn_cache_neg = crossattn_cache_neg  # always store the clean cache
+        self.crossattn_cache_pos = crossattn_cache_pos
+        self.crossattn_cache_neg = crossattn_cache_neg
 
     def _initialize_sample_scheduler(self, noise):
         if self.sample_solver == 'unipc':

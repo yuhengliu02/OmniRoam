@@ -51,7 +51,7 @@ class BidirectionalInferencePipeline(torch.nn.Module):
                 conditional_dict=conditional_dict,
                 timestep=torch.ones(
                     noise.shape[:2], dtype=torch.long, device=noise.device) * current_timestep
-            )  # [B, F, C, H, W]
+            )
 
             next_timestep = self.denoising_step_list[index + 1] * torch.ones(
                 noise.shape[:2], dtype=torch.long, device=noise.device)

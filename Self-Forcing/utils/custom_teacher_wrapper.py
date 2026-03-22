@@ -106,10 +106,8 @@ class CustomTeacherWrapper(nn.Module):
         if len(unexpected_keys) > 0:
             print(f"[Custom{model_name}] First 10 unexpected keys: {unexpected_keys[:10]}")
         
-        # Verify critical modules are loaded
         assert hasattr(self.model, "speed_token_proj"), "speed_token_proj not loaded"
         assert hasattr(self.model, "speed_token_scale"), "speed_token_scale not loaded"
-        # Double-check speed_token_scale is 1D (for FSDP)
         assert self.model.speed_token_scale.ndim == 1, f"speed_token_scale must be 1D for FSDP, got shape {self.model.speed_token_scale.shape}"
         assert hasattr(self.model.blocks[0], "cam_traj_encoder"), "cam_traj_encoder not loaded"
         assert hasattr(self.model.blocks[0], "projector"), "projector not loaded"
@@ -119,11 +117,9 @@ class CustomTeacherWrapper(nn.Module):
         self.scheduler = FlowMatchScheduler(shift=8.0, sigma_min=0.0, extra_one_step=True)
         self.scheduler.set_timesteps(1000, training=True)
         
-        # Move to target dtype and device
         self.model = self.model.to(dtype=torch_dtype, device=device)
-        self.uniform_timestep = True  # Non-causal model uses uniform timestep
+        self.uniform_timestep = True
         
-        # Initialize gradient checkpointing flag (controlled via enable_gradient_checkpointing)
         self.use_gradient_checkpointing = False
         
         print(f"[Custom{model_name}] ✓ Initialization complete - Ready for use")
@@ -148,7 +144,6 @@ class CustomTeacherWrapper(nn.Module):
         sigmas = self.scheduler.sigmas.double().to(flow_pred.device)
         timesteps = self.scheduler.timesteps.double().to(flow_pred.device)
         
-        # Find sigma for each timestep
         timestep_id = torch.argmin(
             (timesteps.unsqueeze(0) - timestep.double().unsqueeze(1)).abs(), dim=1
         )
@@ -222,7 +217,6 @@ class CustomTeacherWrapper(nn.Module):
         
         timestep_per_frame = uniform_timestep.unsqueeze(1).expand(-1, F)
         
-        # Convert flow to x0
         x0_pred = self._convert_flow_pred_to_x0(
             flow_pred=flow_pred.flatten(0, 1),
             xt=noisy_image_or_video.flatten(0, 1),
@@ -252,7 +246,6 @@ class CustomTeacherWrapper(nn.Module):
 
         pred = (x_t - x_0) / sigma_t
         """
-        # use higher precision for calculations
         original_dtype = x0_pred.dtype
         x0_pred, xt, sigmas, timesteps = map(
             lambda x: x.double().to(x0_pred.device), [x0_pred, xt,

@@ -1,8 +1,5 @@
 #!/bin/bash
-# Local Panorama Inference Script for OmniRoam Self-Forcing
-# This script generates videos from local panorama images using the trained self-forcing model
-
-set -e  # Exit on error
+set -e
 
 # ==========================================
 # Configuration - Modify these paths as needed
@@ -13,14 +10,14 @@ CONFIG_PATH="./configs/self_forcing_dmd_omniroam.yaml"
 CHECKPOINT_PATH="" # add the path to the checkpoint
 
 # Input data
-LOCAL_FOLDER="../vis_images"  # Folder containing panorama images (.jpg, .png, etc.)
+LOCAL_FOLDER="../vis_images"
 
 # Output settings
 OUTPUT_FOLDER="./inference_output"
-NUM_SAMPLES=5  # Number of images to process (limited by available images)
+NUM_SAMPLES=5
 
 # Trajectory settings
-TRAJ_PRESET="forward"  # Options: forward, backward, left, right, up, down
+TRAJ_PRESET="forward"  # Options: forward, backward, left, right
 TRAJ_STEP_M=1.0        # Step size in meters
 RE_SCALE_POSE="fixed:1.0"  # Trajectory rescale: none | unit_median | fixed:<float>
 

@@ -64,14 +64,12 @@ def make_cam_traj_from_preset_refspace(
 ) -> torch.Tensor:
     t_list = []
     
-    if preset in ["forward", "backward", "left", "right", "up", "down"]:
+    if preset in ["forward", "backward", "left", "right"]:
         dir_map = {
             "forward":  np.array([+1, 0, 0], dtype=np.float64),
             "backward": np.array([-1, 0, 0], dtype=np.float64),
             "right":    np.array([0, 0, +1], dtype=np.float64),
             "left":     np.array([0, 0, -1], dtype=np.float64),
-            "up":       np.array([0, +1, 0], dtype=np.float64),
-            "down":     np.array([0, -1, 0], dtype=np.float64),
         }
         d = dir_map[preset] * (float(step_m) / 4.0)
         p = np.zeros(3, dtype=np.float64)

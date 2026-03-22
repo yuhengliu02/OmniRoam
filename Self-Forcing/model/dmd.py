@@ -40,10 +40,8 @@ class DMD(SelfForcingModel):
             self.generator.enable_gradient_checkpointing()
             self.fake_score.enable_gradient_checkpointing()
 
-        # this will be init later with fsdp-wrapped modules
         self.inference_pipeline: SelfForcingTrainingPipeline = None
 
-        # Step 2: Initialize all dmd hyperparameters
         self.num_train_timestep = args.num_train_timestep
         self.min_step = int(0.02 * self.num_train_timestep)
         self.max_step = int(0.98 * self.num_train_timestep)
@@ -63,7 +61,6 @@ class DMD(SelfForcingModel):
         else:
             self.scheduler.alphas_cumprod = None
 
-    # 在 _compute_kl_grad 方法中添加打印
     def _compute_kl_grad(
         self, noisy_image_or_video: torch.Tensor,
         estimated_clean_image_or_video: torch.Tensor,
@@ -108,7 +105,6 @@ class DMD(SelfForcingModel):
             critic_input = noisy_image_or_video
             critic_timestep = timestep
         
-        # Critic forward
         debug = getattr(self.args, "debug", False)
         if debug and dist.is_initialized() and dist.get_rank() == 0:
             print(f"\n[DEBUG][DMD.KL_Grad] Critic (fake_score) forward")
@@ -150,7 +146,6 @@ class DMD(SelfForcingModel):
             if debug and dist.is_initialized() and dist.get_rank() == 0:
                 print(f"  └─ Extracted target prediction (first 21 frames): {tuple(pred_fake_image.shape)}")
         
-        # Teacher forward
         if debug and dist.is_initialized() and dist.get_rank() == 0:
             print(f"\n[DEBUG][DMD.KL_Grad] Teacher (real_score) forward")
             print(f"  ├─ Input shape: {tuple(teacher_input.shape)}")
@@ -182,7 +177,6 @@ class DMD(SelfForcingModel):
             if debug and dist.is_initialized() and dist.get_rank() == 0:
                 print(f"  └─ Extracted target prediction (first 21 frames): {tuple(pred_real_image.shape)}")
 
-        # Compute gradient
         grad = (pred_fake_image - pred_real_image)
 
         if normalization:
@@ -214,7 +208,7 @@ class DMD(SelfForcingModel):
         gradient_mask: Optional[torch.Tensor] = None,
         denoised_timestep_from: int = 0,
         denoised_timestep_to: int = 0,
-        input_latent: torch.Tensor = None,  # NEW: static video latent for custom teacher
+        input_latent: torch.Tensor = None,
     ) -> Tuple[torch.Tensor, dict]:
         """
         Compute the DMD loss (eq 7 in https://arxiv.org/abs/2311.18828).
@@ -233,7 +227,6 @@ class DMD(SelfForcingModel):
         batch_size, num_frame = image_or_video.shape[:2]
 
         with torch.no_grad():
-            # Step 1: Randomly sample timestep based on the given schedule and corresponding noise
             min_timestep = denoised_timestep_to if self.ts_schedule and denoised_timestep_to is not None else self.min_score_timestep
             max_timestep = denoised_timestep_from if self.ts_schedule_max and denoised_timestep_from is not None else self.num_train_timestep
             timestep = self._get_timestep(
@@ -245,7 +238,6 @@ class DMD(SelfForcingModel):
                 uniform_timestep=True
             )
 
-            # TODO:should we change it to `timestep = self.scheduler.timesteps[timestep]`?
             if self.timestep_shift > 1:
                 timestep = self.timestep_shift * \
                     (timestep / 1000) / \
@@ -259,14 +251,13 @@ class DMD(SelfForcingModel):
                 timestep.flatten(0, 1)
             ).detach().unflatten(0, (batch_size, num_frame))
 
-            # Step 2: Compute the KL grad
             grad, dmd_log_dict = self._compute_kl_grad(
                 noisy_image_or_video=noisy_latent,
                 estimated_clean_image_or_video=original_latent,
                 timestep=timestep,
                 conditional_dict=conditional_dict,
                 unconditional_dict=unconditional_dict,
-                input_latent=input_latent  # NEW: pass static video latent
+                input_latent=input_latent
             )
 
         if gradient_mask is not None:
@@ -284,7 +275,7 @@ class DMD(SelfForcingModel):
         unconditional_dict: dict,
         clean_latent: torch.Tensor,
         initial_latent: torch.Tensor = None,
-        input_latent: torch.Tensor = None  # NEW: static video latent for custom teacher
+        input_latent: torch.Tensor = None
     ) -> Tuple[torch.Tensor, dict]:
         """
         Generate image/videos from noise and compute the DMD loss.
@@ -302,10 +293,7 @@ class DMD(SelfForcingModel):
             - loss: a scalar tensor representing the generator loss.
             - generator_log_dict: a dictionary containing the intermediate tensors for logging.
         """
-        # ===== Convert input_latent to initial_latent for generator KV cache pre-fill =====
         if input_latent is not None and initial_latent is None:
-            # Extract last 3 frames from static video latent for KV cache pre-fill
-            # input_latent: [B, 21, 16, H, W] -> initial_latent: [B, 3, 16, H, W]
             initial_latent = input_latent[:, -3:, :, :, :]
             
             debug = getattr(self.args, "debug", False)
@@ -316,7 +304,6 @@ class DMD(SelfForcingModel):
                 print(f"  ├─ initial_latent shape (last 3 frames): {tuple(initial_latent.shape)}")
                 print(f"  ├─ initial_latent stats: mean={initial_latent.mean().item():.4f}, std={initial_latent.std().item():.4f}")
                 print(f"  └─ ✓ Conversion successful - will be used for KV cache pre-fill")
-        # ==================================================================================
         
         debug = getattr(self.args, "debug", False)
         if debug and dist.is_initialized() and dist.get_rank() == 0:
@@ -327,9 +314,8 @@ class DMD(SelfForcingModel):
             if 'cam_traj' in conditional_dict:
                 traj = conditional_dict['cam_traj']
                 print(f"  ├─ cam_traj shape: {tuple(traj.shape)}")
-                # Extract translation vectors and compute statistics
                 M = traj.view(traj.shape[0], traj.shape[1], 3, 4)
-                t = M[:, :, :, 3]  # (B, 21, 3)
+                t = M[:, :, :, 3]
                 dt = t[:, 1:] - t[:, :-1]
                 step_sizes = torch.linalg.norm(dt, dim=2)
                 print(f"  ├─ trajectory translation norms: min={t.norm(dim=2).min().item():.4f}, max={t.norm(dim=2).max().item():.4f}")
@@ -338,7 +324,6 @@ class DMD(SelfForcingModel):
                 print(f"  ├─ speed_scalar: {conditional_dict['speed_scalar'].item():.2f}")
             print(f"  └─ Entering backward simulation...")
         
-        # Step 1: Unroll generator to obtain fake videos
         pred_image, gradient_mask, denoised_timestep_from, denoised_timestep_to = self._run_generator(
             image_or_video_shape=image_or_video_shape,
             conditional_dict=conditional_dict,
@@ -354,7 +339,6 @@ class DMD(SelfForcingModel):
             print(f"  ├─ denoised_timestep_from: {denoised_timestep_from}")
             print(f"  └─ denoised_timestep_to: {denoised_timestep_to}")
 
-        # Step 2: Compute the DMD loss
         dmd_loss, dmd_log_dict = self.compute_distribution_matching_loss(
             image_or_video=pred_image,
             conditional_dict=conditional_dict,
@@ -362,7 +346,7 @@ class DMD(SelfForcingModel):
             gradient_mask=gradient_mask,
             denoised_timestep_from=denoised_timestep_from,
             denoised_timestep_to=denoised_timestep_to,
-            input_latent=input_latent  # NEW: pass static video latent
+            input_latent=input_latent
         )
 
         return dmd_loss, dmd_log_dict
@@ -374,7 +358,7 @@ class DMD(SelfForcingModel):
         unconditional_dict: dict,
         clean_latent: torch.Tensor,
         initial_latent: torch.Tensor = None,
-        input_latent: torch.Tensor = None  # NEW: static video latent for custom teacher
+        input_latent: torch.Tensor = None
     ) -> Tuple[torch.Tensor, dict]:
         """
         Generate image/videos from noise and train the critic with generated samples.
@@ -393,10 +377,7 @@ class DMD(SelfForcingModel):
             - critic_log_dict: a dictionary containing the intermediate tensors for logging.
         """
         
-        # ===== Convert input_latent to initial_latent for generator KV cache pre-fill =====
         if input_latent is not None and initial_latent is None:
-            # Extract last 3 frames from static video latent for KV cache pre-fill
-            # input_latent: [B, 21, 16, H, W] -> initial_latent: [B, 3, 16, H, W]
             initial_latent = input_latent[:, -3:, :, :, :]
             
             debug = getattr(self.args, "debug", False)
@@ -405,9 +386,6 @@ class DMD(SelfForcingModel):
                 print(f"[DEBUG][Critic.Loss] Step 1: Convert input_latent to initial_latent")
                 print(f"  ├─ input_latent shape: {tuple(input_latent.shape)}")
                 print(f"  └─ initial_latent shape (last 3 frames): {tuple(initial_latent.shape)}")
-        # ==================================================================================
-
-        # Step 1: Run generator on backward simulated noisy input
         with torch.no_grad():
             generated_image, _, denoised_timestep_from, denoised_timestep_to = self._run_generator(
                 image_or_video_shape=image_or_video_shape,
@@ -419,32 +397,7 @@ class DMD(SelfForcingModel):
         if debug and dist.is_initialized() and dist.get_rank() == 0:
             print(f"\n[DEBUG][Critic.Loss] Step 2: Generator produced fake samples")
             print(f"  └─ generated_image shape: {tuple(generated_image.shape)}")
-        
-        # ===== 添加这段：清理 generator 的 KV cache =====
-        # if dist.is_initialized() and dist.get_rank() == 0:
-        #     print(f"    ├─ Clearing generator KV cache after generation...")
-        
-        # # Clear pipeline's KV cache
-        # if hasattr(self, 'inference_pipeline') and self.inference_pipeline is not None:
-        #     if hasattr(self.inference_pipeline, 'kv_cache1') and self.inference_pipeline.kv_cache1 is not None:
-        #         del self.inference_pipeline.kv_cache1
-        #         self.inference_pipeline.kv_cache1 = None
-        #     if hasattr(self.inference_pipeline, 'kv_cache2') and self.inference_pipeline.kv_cache2 is not None:
-        #         del self.inference_pipeline.kv_cache2
-        #         self.inference_pipeline.kv_cache2 = None
-        #     if hasattr(self.inference_pipeline, 'crossattn_cache'):
-        #         del self.inference_pipeline.crossattn_cache
-        #         self.inference_pipeline.crossattn_cache = None
-        
-        # # Force CUDA cache cleanup
-        # torch.cuda.empty_cache()
-        
-        # if dist.is_initialized() and dist.get_rank() == 0:
-        #     allocated = torch.cuda.memory_allocated() / 1e9
-        #     print(f"    │  └─ After KV cache cleanup: {allocated:.2f} GB allocated")
-        # ===================================================
 
-        # Step 2: Compute the fake prediction
         min_timestep = denoised_timestep_to if self.ts_schedule and denoised_timestep_to is not None else self.min_score_timestep
         max_timestep = denoised_timestep_from if self.ts_schedule_max and denoised_timestep_from is not None else self.num_train_timestep
         critic_timestep = self._get_timestep(
@@ -469,20 +422,16 @@ class DMD(SelfForcingModel):
             critic_timestep.flatten(0, 1)
         ).unflatten(0, image_or_video_shape[:2])
 
-        # ===== 为 custom teacher/critic 构建 42 帧输入 =====
         use_custom_teacher = getattr(self.args, "use_custom_teacher", False)
         
         debug = getattr(self.args, "debug", False)
         if use_custom_teacher and input_latent is not None:
-            # Concatenate [noisy_target_21 | clean_input_21] → 42 frames
-            # noisy_generated_image: [B, 21, 16, H, W] - 需要去噪的目标
-            # input_latent: [B, 21, 16, H, W] - 静态输入条件（不加噪）
             B, F, C, H, W = noisy_generated_image.shape
             assert F == 21, f"Expected 21 frames, got {F}"
             assert input_latent.shape[1] == 21, f"Expected 21 input frames, got {input_latent.shape[1]}"
             
-            critic_input = torch.cat([noisy_generated_image, input_latent], dim=1)  # [B, 42, 16, H, W]
-            critic_input_timestep = critic_timestep.repeat(1, 2)  # [B, 42]
+            critic_input = torch.cat([noisy_generated_image, input_latent], dim=1)
+            critic_input_timestep = critic_timestep.repeat(1, 2)
             
             if debug and dist.is_initialized() and dist.get_rank() == 0:
                 print(f"\n[DEBUG][Critic.Loss] Step 3: Building 42-frame input for critic")
@@ -492,26 +441,20 @@ class DMD(SelfForcingModel):
         else:
             critic_input = noisy_generated_image
             critic_input_timestep = critic_timestep
-        # =======================================================
 
         _, pred_fake_image = self.fake_score(
-            noisy_image_or_video=critic_input,        # ← 现在是 42 帧（如果 use_custom_teacher）
+            noisy_image_or_video=critic_input,
             conditional_dict=conditional_dict,
-            timestep=critic_input_timestep            # ← 42 个 timesteps
+            timestep=critic_input_timestep
         )
         
-        # ===== 提取目标部分（前 21 帧）用于 loss 计算 =====
         debug = getattr(self.args, "debug", False)
         if use_custom_teacher and input_latent is not None:
-            # pred_fake_image 是 [B, 42, 16, H, W]
-            # 只取前 21 帧（目标部分）用于计算 loss
             pred_fake_image = pred_fake_image[:, :21]
             
             if debug and dist.is_initialized() and dist.get_rank() == 0:
                 print(f"  └─ Extracted target prediction: {tuple(pred_fake_image.shape)}")
-        # =======================================================
 
-        # Step 3: Compute the denoising loss for the fake critic
         if self.args.denoising_loss_type == "flow":
             from utils.wan_wrapper import WanDiffusionWrapper
             flow_pred = WanDiffusionWrapper._convert_x0_to_flow_pred(
@@ -539,7 +482,6 @@ class DMD(SelfForcingModel):
             flow_pred=flow_pred
         )
 
-        # Step 5: Debugging Log
         critic_log_dict = {
             "critic_timestep": critic_timestep.detach()
         }

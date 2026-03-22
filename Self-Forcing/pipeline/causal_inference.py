@@ -16,13 +16,11 @@ class CausalInferencePipeline(torch.nn.Module):
             vae=None
     ):
         super().__init__()
-        # Step 1: Initialize all models
         self.generator = WanDiffusionWrapper(
             **getattr(args, "model_kwargs", {}), is_causal=True) if generator is None else generator
         self.text_encoder = WanTextEncoder() if text_encoder is None else text_encoder
         self.vae = WanVAEWrapper() if vae is None else vae
 
-        # Step 2: Initialize all causal hyperparmeters
         self.scheduler = self.generator.get_scheduler()
         self.denoising_step_list = torch.tensor(
             args.denoising_step_list, dtype=torch.long)
@@ -71,16 +69,13 @@ class CausalInferencePipeline(torch.nn.Module):
         """
         batch_size, num_frames, num_channels, height, width = noise.shape
         if not self.independent_first_frame or (self.independent_first_frame and initial_latent is not None):
-            # If the first frame is independent and the first frame is provided, then the number of frames in the
-            # noise should still be a multiple of num_frame_per_block
             assert num_frames % self.num_frame_per_block == 0
             num_blocks = num_frames // self.num_frame_per_block
         else:
-            # Using a [1, 4, 4, 4, 4, 4, ...] model to generate a video without image conditioning
             assert (num_frames - 1) % self.num_frame_per_block == 0
             num_blocks = (num_frames - 1) // self.num_frame_per_block
         num_input_frames = initial_latent.shape[1] if initial_latent is not None else 0
-        num_output_frames = num_frames + num_input_frames  # add the initial latent frames
+        num_output_frames = num_frames + num_input_frames
         conditional_dict = self.text_encoder(
             text_prompts=text_prompts
         )
@@ -95,7 +90,6 @@ class CausalInferencePipeline(torch.nn.Module):
             dtype=noise.dtype
         )
 
-        # Set up profiling if requested
         if profile:
             init_start = torch.cuda.Event(enable_timing=True)
             init_end = torch.cuda.Event(enable_timing=True)
@@ -108,7 +102,6 @@ class CausalInferencePipeline(torch.nn.Module):
             block_end = torch.cuda.Event(enable_timing=True)
             init_start.record()
 
-        # Step 1: Initialize KV cache to all zeros
         if self.kv_cache1 is None:
             self._initialize_kv_cache(
                 batch_size=batch_size,
@@ -121,22 +114,18 @@ class CausalInferencePipeline(torch.nn.Module):
                 device=noise.device
             )
         else:
-            # reset cross attn cache
             for block_index in range(self.num_transformer_blocks):
                 self.crossattn_cache[block_index]["is_init"] = False
-            # reset kv cache
             for block_index in range(len(self.kv_cache1)):
                 self.kv_cache1[block_index]["global_end_index"] = torch.tensor(
                     [0], dtype=torch.long, device=noise.device)
                 self.kv_cache1[block_index]["local_end_index"] = torch.tensor(
                     [0], dtype=torch.long, device=noise.device)
 
-        # Step 2: Cache context feature
         current_start_frame = 0
         if initial_latent is not None:
             timestep = torch.ones([batch_size, 1], device=noise.device, dtype=torch.int64) * 0
             if self.independent_first_frame:
-                # Assume num_input_frames is 1 + self.num_frame_per_block * num_input_blocks
                 assert (num_input_frames - 1) % self.num_frame_per_block == 0
                 num_input_blocks = (num_input_frames - 1) // self.num_frame_per_block
                 output[:, :1] = initial_latent[:, :1]
@@ -150,7 +139,6 @@ class CausalInferencePipeline(torch.nn.Module):
                 )
                 current_start_frame += 1
             else:
-                # Assume num_input_frames is self.num_frame_per_block * num_input_blocks
                 assert num_input_frames % self.num_frame_per_block == 0
                 num_input_blocks = num_input_frames // self.num_frame_per_block
 
@@ -173,7 +161,6 @@ class CausalInferencePipeline(torch.nn.Module):
             torch.cuda.synchronize()
             diffusion_start.record()
 
-        # Step 3: Temporal denoising loop
         all_num_frames = [self.num_frame_per_block] * num_blocks
         if self.independent_first_frame and initial_latent is None:
             all_num_frames = [1] + all_num_frames
@@ -184,10 +171,8 @@ class CausalInferencePipeline(torch.nn.Module):
             noisy_input = noise[
                 :, current_start_frame - num_input_frames:current_start_frame + current_num_frames - num_input_frames]
 
-            # Step 3.1: Spatial denoising loop
             for index, current_timestep in enumerate(self.denoising_step_list):
                 print(f"current_timestep: {current_timestep}")
-                # set current timestep
                 timestep = torch.ones(
                     [batch_size, current_num_frames],
                     device=noise.device,
@@ -210,7 +195,6 @@ class CausalInferencePipeline(torch.nn.Module):
                             [batch_size * current_num_frames], device=noise.device, dtype=torch.long)
                     ).unflatten(0, denoised_pred.shape[:2])
                 else:
-                    # for getting real output
                     _, denoised_pred = self.generator(
                         noisy_image_or_video=noisy_input,
                         conditional_dict=conditional_dict,
@@ -220,10 +204,8 @@ class CausalInferencePipeline(torch.nn.Module):
                         current_start=current_start_frame * self.frame_seq_length
                     )
 
-            # Step 3.2: record the model's output
             output[:, current_start_frame:current_start_frame + current_num_frames] = denoised_pred
 
-            # Step 3.3: rerun with timestep zero to update KV cache using clean context
             context_timestep = torch.ones_like(timestep) * self.args.context_noise
             self.generator(
                 noisy_image_or_video=denoised_pred,
@@ -240,23 +222,19 @@ class CausalInferencePipeline(torch.nn.Module):
                 block_time = block_start.elapsed_time(block_end)
                 block_times.append(block_time)
 
-            # Step 3.4: update the start and end frame indices
             current_start_frame += current_num_frames
 
         if profile:
-            # End diffusion timing and synchronize CUDA
             diffusion_end.record()
             torch.cuda.synchronize()
             diffusion_time = diffusion_start.elapsed_time(diffusion_end)
             init_time = init_start.elapsed_time(init_end)
             vae_start.record()
 
-        # Step 4: Decode the output
         video = self.vae.decode_to_pixel(output, use_cache=False)
         video = (video * 0.5 + 0.5).clamp(0, 1)
 
         if profile:
-            # End VAE timing and synchronize CUDA
             vae_end.record()
             torch.cuda.synchronize()
             vae_time = vae_start.elapsed_time(vae_end)
@@ -281,10 +259,8 @@ class CausalInferencePipeline(torch.nn.Module):
         """
         kv_cache1 = []
         if self.local_attn_size != -1:
-            # Use the local attention size to compute the KV cache size
             kv_cache_size = self.local_attn_size * self.frame_seq_length
         else:
-            # Use the default KV cache size
             kv_cache_size = 32760
 
         for _ in range(self.num_transformer_blocks):
@@ -295,7 +271,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 "local_end_index": torch.tensor([0], dtype=torch.long, device=device)
             })
 
-        self.kv_cache1 = kv_cache1  # always store the clean cache
+        self.kv_cache1 = kv_cache1
 
     def _initialize_crossattn_cache(self, batch_size, dtype, device):
         """

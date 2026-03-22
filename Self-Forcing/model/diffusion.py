@@ -21,14 +21,12 @@ class CausalDiffusion(BaseModel):
         if args.gradient_checkpointing:
             self.generator.enable_gradient_checkpointing()
 
-        # Step 2: Initialize all hyperparameters
         self.num_train_timestep = args.num_train_timestep
         self.min_step = int(0.02 * self.num_train_timestep)
         self.max_step = int(0.98 * self.num_train_timestep)
         self.guidance_scale = args.guidance_scale
         self.timestep_shift = getattr(args, "timestep_shift", 1.0)
         self.teacher_forcing = getattr(args, "teacher_forcing", False)
-        # Noise augmentation in teacher forcing, we add small noise to clean context latents
         self.noise_augmentation_max_timestep = getattr(args, "noise_augmentation_max_timestep", 0)
 
     def _initialize_models(self, args):
@@ -66,7 +64,6 @@ class CausalDiffusion(BaseModel):
         noise = torch.randn_like(clean_latent)
         batch_size, num_frame = image_or_video_shape[:2]
 
-        # Step 2: Randomly sample a timestep and add noise to denoiser inputs
         index = self._get_timestep(
             0,
             self.scheduler.num_train_timesteps,
@@ -83,7 +80,6 @@ class CausalDiffusion(BaseModel):
         ).unflatten(0, (batch_size, num_frame))
         training_target = self.scheduler.training_target(clean_latent, noise, timestep)
 
-        # Step 3: Noise augmentation, also add small noise to clean context latents
         if self.noise_augmentation_max_timestep > 0:
             index_clean_aug = self._get_timestep(
                 0,
@@ -103,7 +99,6 @@ class CausalDiffusion(BaseModel):
             clean_latent_aug = clean_latent
             timestep_clean_aug = None
 
-        # Compute loss
         flow_pred, x0_pred = self.generator(
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
@@ -111,7 +106,6 @@ class CausalDiffusion(BaseModel):
             clean_x=clean_latent_aug if self.teacher_forcing else None,
             aug_t=timestep_clean_aug if self.teacher_forcing else None
         )
-        # loss = torch.nn.functional.mse_loss(flow_pred.float(), training_target.float())
         loss = torch.nn.functional.mse_loss(
             flow_pred.float(), training_target.float(), reduction='none'
         ).mean(dim=(2, 3, 4))

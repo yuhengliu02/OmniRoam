@@ -30,7 +30,6 @@ class BaseModel(nn.Module):
         self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), is_causal=True)
         self.generator.model.requires_grad_(True)
 
-        # ===== Add custom modules to student generator (if using custom teacher) =====
         use_custom_teacher = getattr(args, "use_custom_teacher", False)
         if use_custom_teacher:
             print("[BaseModel] Adding custom condition modules to student generator...")
@@ -38,14 +37,11 @@ class BaseModel(nn.Module):
             param_dtype = next(self.generator.model.parameters()).dtype
             param_device = next(self.generator.model.parameters()).device
             
-            # Speed token modules
             self.generator.model.speed_token_proj = torch.nn.Linear(1, dim, bias=True).to(dtype=param_dtype, device=param_device)
             torch.nn.init.normal_(self.generator.model.speed_token_proj.weight, mean=0.0, std=1e-2)
             torch.nn.init.zeros_(self.generator.model.speed_token_proj.bias)
-            # FSDP requires 1D tensor instead of scalar
             self.generator.model.speed_token_scale = torch.nn.Parameter(torch.tensor([1e-1], dtype=param_dtype, device=param_device))
             
-            # Camera trajectory encoder and projector for each block
             for blk in self.generator.model.blocks:
                 blk.cam_traj_encoder = torch.nn.Linear(12, dim, bias=True).to(dtype=param_dtype, device=param_device)
                 with torch.no_grad():
@@ -59,9 +55,6 @@ class BaseModel(nn.Module):
                     blk.projector.bias.zero_()
             
             print(f"[BaseModel] Added custom modules to student generator: speed_token_proj, speed_token_scale, cam_traj_encoder, projector to {len(self.generator.model.blocks)} blocks")
-        # ========================================================================
-
-        # ===== Custom Teacher Support =====
         if use_custom_teacher:
             from utils.custom_teacher_wrapper import CustomTeacherWrapper
             print("[BaseModel] Using custom finetuned teacher (real_score)")
@@ -71,7 +64,6 @@ class BaseModel(nn.Module):
             if teacher_ckpt_path is None:
                 raise ValueError("use_custom_teacher=True but teacher_ckpt_path not provided")
             
-            # Teacher (frozen)
             self.real_score = CustomTeacherWrapper(
                 base_model_path=base_wan_path,
                 finetuned_ckpt_path=teacher_ckpt_path,
@@ -81,7 +73,6 @@ class BaseModel(nn.Module):
             )
             self.real_score.requires_grad_(False)
             
-            # Critic (trainable) - initialize from same finetuned weights
             print("[BaseModel] Using custom finetuned critic (fake_score) - TRAINABLE")
             self.fake_score = CustomTeacherWrapper(
                 base_model_path=base_wan_path,
@@ -99,7 +90,6 @@ class BaseModel(nn.Module):
             print("[BaseModel] Using vanilla WAN2.1 critic (fake_score) - TRAINABLE")
             self.fake_score = WanDiffusionWrapper(model_name=self.fake_model_name, is_causal=False)
             self.fake_score.model.requires_grad_(True)
-        # ==================================
 
         self.text_encoder = WanTextEncoder()
         self.text_encoder.requires_grad_(False)
@@ -142,9 +132,7 @@ class BaseModel(nn.Module):
                 device=self.device,
                 dtype=torch.long
             )
-            # make the noise level the same within every block
             if self.independent_first_frame:
-                # the first frame is always kept the same
                 timestep_from_second = timestep[:, 1:]
                 timestep_from_second = timestep_from_second.reshape(
                     timestep_from_second.shape[0], -1, num_frame_per_block)
@@ -184,7 +172,6 @@ class SelfForcingModel(BaseModel):
             - pred_image: a tensor with shape [B, F, C, H, W].
             - denoised_timestep: an integer
         """
-        # Step 1: Sample noise and backward simulate the generator's input
         assert getattr(self.args, "backward_simulation", True), "Backward simulation needs to be enabled"
         if initial_latent is not None:
             conditional_dict["initial_latent"] = initial_latent
@@ -193,8 +180,6 @@ class SelfForcingModel(BaseModel):
         else:
             noise_shape = image_or_video_shape.copy()
 
-        # During training, the number of generated frames should be uniformly sampled from
-        # [21, self.num_training_frames], but still being a multiple of self.num_frame_per_block
         min_num_frames = 20 if self.args.independent_first_frame else 21
         max_num_frames = self.num_training_frames - 1 if self.args.independent_first_frame else self.num_training_frames
         assert max_num_frames % self.num_frame_per_block == 0
@@ -208,7 +193,6 @@ class SelfForcingModel(BaseModel):
         if self.args.independent_first_frame and initial_latent is None:
             num_generated_frames += 1
             min_num_frames += 1
-        # Sync num_generated_frames across all processes
         noise_shape[1] = num_generated_frames
 
         pred_image_or_video, denoised_timestep_from, denoised_timestep_to = self._consistency_backward_simulation(
@@ -216,23 +200,12 @@ class SelfForcingModel(BaseModel):
                               device=self.device, dtype=self.dtype),
             **conditional_dict,
         )
-        # ===== CHANGED: Slice frames [3:24] (last 21 frames after pre-fill) =====
-        # Output is 24 frames: [0:3] = pre-fill (initial_latent), [3:24] = generated
-        # For loss calculation, we only use the 21 generated frames
         if pred_image_or_video.shape[1] > 21:
-            # Take frames [3:24] directly (21 frames)
             pred_image_or_video_last_21 = pred_image_or_video[:, 3:24, ...]
-            
-            # Note: The old logic re-encoded the first frame as image_latent.
-            # With the new append mode, frames [3:24] are all generated video frames,
-            # so we use them directly without re-encoding.
-        # ========================================================================
-
         else:
             pred_image_or_video_last_21 = pred_image_or_video
 
         if num_generated_frames != min_num_frames:
-            # Currently, we do not use gradient for the first chunk, since it contains image latents
             gradient_mask = torch.ones_like(pred_image_or_video_last_21, dtype=torch.bool)
             if self.args.independent_first_frame:
                 gradient_mask[:, :1] = False
@@ -265,11 +238,9 @@ class SelfForcingModel(BaseModel):
         if self.inference_pipeline is None:
             self._initialize_inference_pipeline()
 
-        # Extract trajectory and speed if present
         cam_traj = conditional_dict.get("cam_traj", None)
         speed_scalar = conditional_dict.get("speed_scalar", None)
         
-        # Filter out cam_traj and speed_scalar from conditional_dict to pass separately
         filtered_conditional_dict = {k: v for k, v in conditional_dict.items() 
                                       if k not in ["cam_traj", "speed_scalar"]}
 
@@ -295,7 +266,7 @@ class SelfForcingModel(BaseModel):
             independent_first_frame=self.args.independent_first_frame,
             same_step_across_blocks=self.args.same_step_across_blocks,
             last_step_only=self.args.last_step_only,
-            num_max_frames=self.num_training_frames + 3,  # 24 frames (21 generation + 3 pre-fill)
+            num_max_frames=self.num_training_frames + 3,
             context_noise=self.args.context_noise,
-            debug=debug  # NEW: Pass debug flag
+            debug=debug
         )

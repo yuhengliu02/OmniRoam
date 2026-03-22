@@ -23,10 +23,8 @@ class SiD(SelfForcingModel):
             self.fake_score.enable_gradient_checkpointing()
             self.real_score.enable_gradient_checkpointing()
 
-        # this will be init later with fsdp-wrapped modules
         self.inference_pipeline: SelfForcingTrainingPipeline = None
 
-        # Step 2: Initialize all dmd hyperparameters
         self.num_train_timestep = args.num_train_timestep
         self.min_step = int(0.02 * self.num_train_timestep)
         self.max_step = int(0.98 * self.num_train_timestep)
@@ -68,7 +66,6 @@ class SiD(SelfForcingModel):
 
         batch_size, num_frame = image_or_video.shape[:2]
 
-        # Step 1: Randomly sample timestep based on the given schedule and corresponding noise
         min_timestep = denoised_timestep_to if self.ts_schedule and denoised_timestep_to is not None else self.min_score_timestep
         max_timestep = denoised_timestep_from if self.ts_schedule_max and denoised_timestep_from is not None else self.num_train_timestep
         timestep = self._get_timestep(
@@ -93,9 +90,7 @@ class SiD(SelfForcingModel):
             timestep.flatten(0, 1)
         ).unflatten(0, (batch_size, num_frame))
 
-        # Step 2: SiD (May be wrap it?)
         noisy_image_or_video = noisy_latent
-        # Step 2.1: Compute the fake score
         _, pred_fake_image = self.fake_score(
             noisy_image_or_video=noisy_image_or_video,
             conditional_dict=conditional_dict,
@@ -127,7 +122,6 @@ class SiD(SelfForcingModel):
         # TODO: Double?
         sid_loss = (pred_real_image.double() - pred_fake_image.double()) * ((pred_real_image.double() - original_latent.double()) - self.sid_alpha * (pred_real_image.double() - pred_fake_image.double()))
 
-        # Step 2.4: Loss normalizer
         with torch.no_grad():
             p_real = (original_latent - pred_real_image)
             normalizer = torch.abs(p_real).mean(dim=[1, 2, 3, 4], keepdim=True)
@@ -166,14 +160,12 @@ class SiD(SelfForcingModel):
             - loss: a scalar tensor representing the generator loss.
             - generator_log_dict: a dictionary containing the intermediate tensors for logging.
         """
-        # Step 1: Unroll generator to obtain fake videos
         pred_image, gradient_mask, denoised_timestep_from, denoised_timestep_to = self._run_generator(
             image_or_video_shape=image_or_video_shape,
             conditional_dict=conditional_dict,
             initial_latent=initial_latent
         )
 
-        # Step 2: Compute the DMD loss
         dmd_loss, dmd_log_dict = self.compute_distribution_matching_loss(
             image_or_video=pred_image,
             conditional_dict=conditional_dict,
@@ -208,7 +200,6 @@ class SiD(SelfForcingModel):
             - critic_log_dict: a dictionary containing the intermediate tensors for logging.
         """
 
-        # Step 1: Run generator on backward simulated noisy input
         with torch.no_grad():
             generated_image, _, denoised_timestep_from, denoised_timestep_to = self._run_generator(
                 image_or_video_shape=image_or_video_shape,
@@ -216,7 +207,6 @@ class SiD(SelfForcingModel):
                 initial_latent=initial_latent
             )
 
-        # Step 2: Compute the fake prediction
         min_timestep = denoised_timestep_to if self.ts_schedule and denoised_timestep_to is not None else self.min_score_timestep
         max_timestep = denoised_timestep_from if self.ts_schedule_max and denoised_timestep_from is not None else self.num_train_timestep
         critic_timestep = self._get_timestep(
@@ -247,7 +237,6 @@ class SiD(SelfForcingModel):
             timestep=critic_timestep
         )
 
-        # Step 3: Compute the denoising loss for the fake critic
         if self.args.denoising_loss_type == "flow":
             from utils.wan_wrapper import WanDiffusionWrapper
             flow_pred = WanDiffusionWrapper._convert_x0_to_flow_pred(
@@ -275,7 +264,6 @@ class SiD(SelfForcingModel):
             flow_pred=flow_pred
         )
 
-        # Step 5: Debugging Log
         critic_log_dict = {
             "critic_timestep": critic_timestep.detach()
         }

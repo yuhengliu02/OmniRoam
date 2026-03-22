@@ -143,10 +143,7 @@ class SelfForcingTrainingPipeline:
                 prefill_conditional_dict["speed_scalar"] = speed_scalar
                 if self.debug and dist.is_initialized() and dist.get_rank() == 0:
                     print(f"  ├─ speed_scalar: {speed_scalar.item():.2f}")
-            # ================================================
             
-            # Cache initial latent through generator to populate KV cache
-            # These frames are NOT part of the output (they are context from input video)
             if self.debug and dist.is_initialized() and dist.get_rank() == 0:
                 print(f"  ├─ Running generator forward to populate KV cache...")
             
@@ -167,13 +164,11 @@ class SelfForcingTrainingPipeline:
                 print(f"{'='*80}\n")
             
             current_start_frame += num_init_frames
-            # ===============================================================================
             
             if self.debug and (not dist.is_initialized() or dist.get_rank() == 0):
                 print(f"\n[DEBUG][Pipeline.PostPreFill] After KV cache pre-fill")
                 print(f"  ├─ current_start_frame: {current_start_frame} (incremented for append mode)")
                 print(f"  └─ Next block will write to: output[:, {current_start_frame}:{current_start_frame + self.num_frame_per_block}]\n")
-            # ================================================
 
         all_num_frames = [self.num_frame_per_block] * num_blocks
         if self.independent_first_frame and initial_latent is None:
@@ -192,9 +187,7 @@ class SelfForcingTrainingPipeline:
             print(f"  ├─ same_step_across_blocks: {self.same_step_across_blocks}")
             print(f"  └─ denoising_step_list: {[float(x) for x in self.denoising_step_list.tolist()]}")
             print(f"{'='*80}\n")
-        # ================================================
 
-        # for block_index in range(num_blocks):
         for block_index, current_num_frames in enumerate(all_num_frames):
             noisy_input = noise[:, block_index * self.num_frame_per_block:(block_index + 1) * self.num_frame_per_block]
             block_conditional_dict = conditional_dict.copy()
@@ -206,9 +199,7 @@ class SelfForcingTrainingPipeline:
             
             if speed_scalar is not None:
                 block_conditional_dict["speed_scalar"] = speed_scalar
-            # ================================================
 
-            # Step 3.1: Spatial denoising loop
             for index, current_timestep in enumerate(self.denoising_step_list):
                 if self.same_step_across_blocks:
                     exit_flag = (index == exit_flags[0])
@@ -241,8 +232,6 @@ class SelfForcingTrainingPipeline:
                                 [batch_size * current_num_frames], device=noise.device, dtype=torch.long)
                         ).unflatten(0, denoised_pred.shape[:2])
                 else:
-                    # for getting real output
-                    # with torch.set_grad_enabled(current_start_frame >= start_gradient_frame_index):
                     if current_start_frame < start_gradient_frame_index:
                         with torch.no_grad():
                             _, denoised_pred = self.generator(
@@ -267,22 +256,18 @@ class SelfForcingTrainingPipeline:
                         print(f"  [Block {block_index}] Exiting denoising loop at step {index} (exit_flag=True)")
                     break
 
-            # Step 3.2: record the model's output
             if self.debug and (not dist.is_initialized() or dist.get_rank() == 0):
                 print(f"  [Block {block_index}] Writing to output")
                 print(f"    ├─ current_start_frame: {current_start_frame}")
                 print(f"    ├─ Writing to: output[:, {current_start_frame}:{current_start_frame + current_num_frames}]")
                 print(f"    ├─ denoised_pred shape: {tuple(denoised_pred.shape)}")
-            # ================================================
             
             output[:, current_start_frame:current_start_frame + current_num_frames] = denoised_pred
             
             if self.debug and (not dist.is_initialized() or dist.get_rank() == 0):
                 print(f"    └─ ✓ Written successfully\n")
 
-            # Step 3.3: rerun with timestep zero to update the cache
             context_timestep = torch.ones_like(timestep) * self.context_noise
-            # add context noise
             denoised_pred = self.scheduler.add_noise(
                 denoised_pred.flatten(0, 1),
                 torch.randn_like(denoised_pred.flatten(0, 1)),
@@ -299,10 +284,8 @@ class SelfForcingTrainingPipeline:
                     current_start=current_start_frame * self.frame_seq_length
                 )
 
-            # Step 3.4: update the start and end frame indices
             current_start_frame += current_num_frames
 
-        # Step 3.5: Return the denoised timestep
         if not self.same_step_across_blocks:
             denoised_timestep_from, denoised_timestep_to = None, None
         elif exit_flags[0] == len(self.denoising_step_list) - 1:
@@ -315,13 +298,11 @@ class SelfForcingTrainingPipeline:
             denoised_timestep_from = 1000 - torch.argmin(
                 (self.scheduler.timesteps.cuda() - self.denoising_step_list[exit_flags[0]].cuda()).abs(), dim=0).item()
 
-        # ===== DEBUG: Print final output info =====
         if self.debug and (not dist.is_initialized() or dist.get_rank() == 0):
             print(f"\n{'='*80}")
             print(f"[DEBUG][Pipeline.Final] Returning output")
             print(f"  ├─ output shape: {tuple(output.shape)}")
             print(f"  ├─ output stats: mean={output.mean().item():.4f}, std={output.std().item():.4f}")
-            # Count non-zero frames
             non_zero_frames = (output.abs().sum(dim=[2,3,4]) > 1e-6).sum(dim=1)
             print(f"  ├─ Non-zero frames per batch: {non_zero_frames.tolist()}")
             print(f"  └─ Final current_start_frame: {current_start_frame}")
@@ -346,7 +327,7 @@ class SelfForcingTrainingPipeline:
                 "local_end_index": torch.tensor([0], dtype=torch.long, device=device)
             })
 
-        self.kv_cache1 = kv_cache1  # always store the clean cache
+        self.kv_cache1 = kv_cache1
 
     def _initialize_crossattn_cache(self, batch_size, dtype, device):
         """

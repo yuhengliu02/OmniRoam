@@ -17,13 +17,11 @@ class BidirectionalDiffusionInferencePipeline(torch.nn.Module):
             vae=None
     ):
         super().__init__()
-        # Step 1: Initialize all models
         self.generator = WanDiffusionWrapper(
             **getattr(args, "model_kwargs", {}), is_causal=False) if generator is None else generator
         self.text_encoder = WanTextEncoder() if text_encoder is None else text_encoder
         self.vae = WanVAEWrapper() if vae is None else vae
 
-        # Step 2: Initialize scheduler
         self.num_train_timesteps = args.num_train_timestep
         self.sampling_steps = 50
         self.sample_solver = 'unipc'
