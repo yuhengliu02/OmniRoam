@@ -26,7 +26,7 @@ Self Forcing trains autoregressive video diffusion models by **simulating the in
 ---
 
 
-
+https://github.com/user-attachments/assets/d3c16bd8-fa30-4d89-aeda-3ea3a7758c23
 
 
 ## Requirements
