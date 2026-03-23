@@ -7,7 +7,7 @@ set -e
 
 # Model and config paths
 CONFIG_PATH="./configs/self_forcing_dmd_omniroam.yaml"
-CHECKPOINT_PATH="" # add the path to the checkpoint
+CHECKPOINT_PATH="../models/OmniRoam/Self-Forcing/self-forcing.pt"  # default checkpoint path from the main OmniRoam setup
 
 # Input data
 LOCAL_FOLDER="../vis_images"

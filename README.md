@@ -8,7 +8,7 @@
 [![HuggingFace Models](https://img.shields.io/badge/🤗-Models-yellow)](https://huggingface.co/Yuheng02/OmniRoam)
 [![License](https://img.shields.io/badge/License-Adobe%20Research-green)](LICENSE)
 
-Yuheng Liu<sup>1*</sup>, Xin Lin<sup>2</sup>, Xinke Li<sup>3</sup>, Baihan Yang<sup>2</sup>, Chen Wang<sup>4</sup>, Kalyan Sunkavalli<sup>5</sup>, Yannick Hold-Geoffroy<sup>5</sup>, Hao Tan<sup>5</sup>, Kai Zhang<sup>5</sup>, Xiaohui Xie<sup>1</sup>, Zifan Shi<sup>5</sup>, Yiwei Hu<sup>5</sup>
+Yuheng Liu<sup>1*</sup>, Xin Lin<sup>2</sup>, Xinke Li<sup>3</sup>, Baihan Yang<sup>2</sup>, Chen Wang<sup>4*</sup>, Kalyan Sunkavalli<sup>5</sup>, Yannick Hold-Geoffroy<sup>5</sup>, Hao Tan<sup>5</sup>, Kai Zhang<sup>5</sup>, Xiaohui Xie<sup>1</sup>, Zifan Shi<sup>5</sup>, Yiwei Hu<sup>5</sup>
 
 (*Work done during an internship at Adobe)
 
@@ -39,7 +39,7 @@ To train our model, we introduce two panoramic video datasets that incorporate b
 ### Prerequisites
 
 - **OS**: Linux (tested on Ubuntu 20.04+)
-- **GPU**: CUDA-compatible GPU with ≥12GB VRAM (≥24GB recommended for refine stage)
+- **GPU**: CUDA-compatible GPU with ≥20GB VRAM (≥36GB recommended for refine stage)
 - **CUDA**: 11.8 or higher
 - **Python**: 3.9+
 - **FFmpeg**: For video processing
@@ -111,7 +111,7 @@ models/
 
 The Self-forcing stage requires additional dependencies:
 
-Please refer to [Self-Forcing](https://github.com/guandeh17/Self-Forcing) for installation.
+Please refer to [Self-Forcing/README.md](Self-Forcing/README.md) for installation instructions.
 
 ## OmniRoam Studio
 
@@ -152,7 +152,7 @@ For detailed Studio documentation, see [Studio/README.md](Studio/README.md)
 
 We render panoramic videos from the [InteriorGS](https://huggingface.co/datasets/spatialverse/InteriorGS) 3D Gaussian Splatting dataset using our custom rendering pipeline.
 
-**Note**: Due to current policy restrictions, users need to process the InteriorGS dataset using our open-source rendering tools.
+**Note**: Due to current policy restrictions, you need to process the InteriorGS dataset using our open-source rendering tools.
 
 ### Rendering Pipeline
 
@@ -345,9 +345,9 @@ OmniRoam/
 ├── Studio/                     # Web interface
 ├── InteriorGS-Render/          # Dataset rendering pipeline
 ├── Tools/                      # Utility tools
-├── infer_omniroam.py          # Main inference script
-├── train_omniroam.py          # Main training script
-├── download_wan2.1.py         # Download base model
+├── infer_omniroam.py           # Main inference script
+├── train_omniroam.py           # Main training script
+├── download_wan2.1.py          # Download base model
 └── download_omniroam_models.py # Download OmniRoam models
 ```
 
