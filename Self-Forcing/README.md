@@ -86,8 +86,8 @@ If you find these modifications useful for your research, please kindly cite pap
 ```bibtex
 @article{omniroam2026,
   title={OmniRoam: World Wandering via Long-Horizon Panoramic Video Generation},
-  author={},
-  journal={arXiv preprint},
+  author={Yuheng Liu and Xin Lin and Xinke Li and Baihan Yang and Chen Wang and Kalyan Sunkavalli and Yannick Hold-Geoffroy and Hao Tan and Kai Zhang and Xiaohui Xie and Zifan Shi and Yiwei Hu},
+  journal={SIGGRAPH},
   year={2026}
 }
 ```

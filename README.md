@@ -4,8 +4,9 @@
 <h1>OmniRoam: World Wandering via Long-Horizon Panoramic Video Generation</h1>
 
 [![Project Page](https://img.shields.io/badge/Project-Page-blue)](https://yuheng.ink/project-page/omniroam/)
-[![arXiv](https://img.shields.io/badge/arXiv-2026.xxxxx-b31b1b.svg)](https://arxiv.org/abs/xxxx.xxxxx)
+[![arXiv](https://img.shields.io/badge/arXiv-2026.30045-b31b1b.svg)](https://arxiv.org/abs/2603.30045)
 [![HuggingFace Models](https://img.shields.io/badge/🤗-Models-yellow)](https://huggingface.co/Yuheng02/OmniRoam)
+[![Static Badge](https://img.shields.io/badge/Youtube-%23ff0000?style=flat&logo=Youtube)](https://www.youtube.com/watch?v=JDR5lGxArgs)
 [![License](https://img.shields.io/badge/License-Adobe%20Research-green)](LICENSE)
 
 Yuheng Liu<sup>1*</sup>, Xin Lin<sup>2</sup>, Xinke Li<sup>3</sup>, Baihan Yang<sup>2</sup>, Chen Wang<sup>4*</sup>, Kalyan Sunkavalli<sup>5</sup>, Yannick Hold-Geoffroy<sup>5</sup>, Hao Tan<sup>5</sup>, Kai Zhang<sup>5</sup>, Xiaohui Xie<sup>1</sup>, Zifan Shi<sup>5</sup>, Yiwei Hu<sup>5</sup>
@@ -24,6 +25,7 @@ https://github.com/user-attachments/assets/8e26dd1b-43ad-4b0a-8e99-5f97dc637980
 ## Updates
 
 - **[2026-04]** 🎉 Initial release of code, models, and datasets
+- **[2026-03]** 🎉 Our paper is accepted to SIGGRAPH 2026!
 
 
 ## Introduction
@@ -392,8 +394,8 @@ If you find OmniRoam useful for your research, please cite:
 ```bibtex
 @article{omniroam2026,
   title={OmniRoam: World Wandering via Long-Horizon Panoramic Video Generation},
-  author={},
-  journal={arXiv preprint},
+  author={Yuheng Liu and Xin Lin and Xinke Li and Baihan Yang and Chen Wang and Kalyan Sunkavalli and Yannick Hold-Geoffroy and Hao Tan and Kai Zhang and Xiaohui Xie and Zifan Shi and Yiwei Hu},
+  journal={SIGGRAPH},
   year={2026}
 }
 ```
