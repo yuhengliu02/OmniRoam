@@ -114,13 +114,6 @@ The InteriorGS dataset is private. You need to:
    HF_TOKEN = "hf_xxxxxxxxxxxxxxxxxxxxx"  # Your token here
    ```
 
-Or provide it via command line:
-```bash
-./blender-4.5.6-linux-x64/blender --background --python render.py -- \
-    --dataset-file valid_datasets.txt \
-    --hf-token hf_xxxxxxxxxxxxxxxxxxxxx
-```
-
 #### Step 2: Download Camera Path Files
 
 The camera trajectories must be downloaded manually:
