@@ -169,7 +169,7 @@ This command:
 For more control, use the Python script directly:
 
 ```bash
-./blender-4.5.6-linux-x64/blender --background --python render_clean.py -- \
+./blender-4.5.6-linux-x64/blender --background --python render.py -- \
     --dataset-file valid_datasets.txt \
     --split 1 2 3 \
     --total-split 200
@@ -209,7 +209,7 @@ output/<dataset_id>/
 
 1. **PNG Sequence** (`pano_camera0/frame_*.png`)
    - Format: PNG, RGB, 8-bit
-   - Resolution: 1920x960 (configurable)
+   - Resolution: 2880x1440 (configurable)
    - Compression level: 15
    - Count: 800 frames (default)
 
